@@ -1,3 +1,5 @@
+use std::{ffi::OsStr, os::unix::prelude::OsStrExt, path::PathBuf};
+
 use sys::InputHandle_t;
 
 use super::*;
@@ -105,6 +107,71 @@ impl<Manager> Input<Manager> {
         unsafe {
             sys::SteamAPI_ISteamInput_GetAnalogActionData(self.input, input_handle, action_handle)
         }
+    }
+
+    /// Get the origin(s) for a digital action within an action set.
+    ///
+    /// Use this to display the appropriate on-screen prompt for the action.
+    pub fn get_digital_action_origins(
+        &self,
+        input_handle: sys::InputHandle_t,
+        action_set_handle: sys::InputDigitalActionHandle_t,
+        analog_action_handle: sys::InputAnalogActionHandle_t,
+    ) -> Vec<sys::EInputActionOrigin> {
+        unsafe {
+            let origins = [sys::EInputActionOrigin::k_EInputActionOrigin_None;
+                sys::STEAM_INPUT_MAX_ORIGINS as usize]
+                .as_mut_ptr();
+            let quantity = sys::SteamAPI_ISteamInput_GetDigitalActionOrigins(
+                self.input,
+                input_handle,
+                action_set_handle,
+                analog_action_handle,
+                origins,
+            );
+            if quantity == 0 {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(origins as *const _, quantity as usize).to_vec()
+            }
+        }
+    }
+
+    /// Get the origin(s) for an analog action within an action set.
+    ///
+    /// Use this to display the appropriate on-screen prompt for the action.
+    pub fn get_analog_action_origins(
+        &self,
+        input_handle: sys::InputHandle_t,
+        action_set_handle: sys::InputAnalogActionHandle_t,
+        analog_action_handle: sys::InputAnalogActionHandle_t,
+    ) -> Vec<sys::EInputActionOrigin> {
+        unsafe {
+            let origins = [sys::EInputActionOrigin::k_EInputActionOrigin_None;
+                sys::STEAM_INPUT_MAX_ORIGINS as usize]
+                .as_mut_ptr();
+            let quantity = sys::SteamAPI_ISteamInput_GetAnalogActionOrigins(
+                self.input,
+                input_handle,
+                action_set_handle,
+                analog_action_handle,
+                origins,
+            );
+            if quantity == 0 {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(origins as *const _, quantity as usize).to_vec()
+            }
+        }
+    }
+
+    pub fn get_glyph_for_action_origin(&self, origin: sys::EInputActionOrigin) -> PathBuf {
+        let path_str = unsafe {
+            let path_buf =
+                sys::SteamAPI_ISteamInput_GetGlyphForActionOrigin_Legacy(self.input, origin);
+            CStr::from_ptr(path_buf)
+        };
+        OsStr::from_bytes(path_str.to_bytes()).into()
     }
 
     pub fn get_motion_data(&self, input_handle: sys::InputHandle_t) -> sys::InputMotionData_t {
